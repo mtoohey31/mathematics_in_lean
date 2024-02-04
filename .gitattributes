@@ -1,0 +1,5 @@
+*.html linguist-detectable=false
+*.js linguist-detectable=false
+*.css linguist-detectable=false
+/.docker/gitpod/Dockerfile linguist-detectable=false
+**/solutions/*.lean linguist-detectable=false
