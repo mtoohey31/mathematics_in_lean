@@ -45,7 +45,14 @@ example : s ∩ (t ∪ u) ⊆ s ∩ t ∪ s ∩ u := by
   . right; exact ⟨xs, xu⟩
 
 example : s ∩ t ∪ s ∩ u ⊆ s ∩ (t ∪ u) := by
-  sorry
+  rintro x (⟨xins, xint⟩ | ⟨xins, xinu⟩)
+  . constructor
+    . exact xins
+    . left; exact xint
+  . constructor
+    . exact xins
+    . right; exact xinu
+
 example : (s \ t) \ u ⊆ s \ (t ∪ u) := by
   intro x xstu
   have xs : x ∈ s := xstu.1.1
@@ -65,7 +72,19 @@ example : (s \ t) \ u ⊆ s \ (t ∪ u) := by
   rintro (xt | xu) <;> contradiction
 
 example : s \ (t ∪ u) ⊆ (s \ t) \ u := by
-  sorry
+  rintro x ⟨xs, xntu⟩
+  constructor
+  . constructor
+    . exact xs
+    . by_contra xt
+      apply xntu
+      left
+      exact xt
+  . by_contra xu
+    apply xntu
+    right
+    exact xu
+
 example : s ∩ t = t ∩ s := by
   ext x
   simp only [mem_inter_iff]
@@ -84,18 +103,47 @@ example : s ∩ t = t ∩ s := by
   . rintro x ⟨xt, xs⟩; exact ⟨xs, xt⟩
 
 example : s ∩ t = t ∩ s :=
-    Subset.antisymm sorry sorry
-example : s ∩ (s ∪ t) = s := by
-  sorry
+    Subset.antisymm (fun _ ⟨xs, xt⟩ ↦ ⟨xt, xs⟩) (fun _ ⟨xt, xs⟩ ↦ ⟨xs, xt⟩)
 
-example : s ∪ s ∩ t = s := by
-  sorry
+example : s ∩ (s ∪ t) = s :=
+  Subset.antisymm (fun _ ⟨xs, _⟩ ↦ xs) (fun _ xs ↦ ⟨xs, Or.inl xs⟩)
+
+example : s ∪ s ∩ t = s :=
+  Subset.antisymm (fun _ xmem ↦ Or.elim xmem id And.left) (fun _ xs ↦ Or.inl xs)
 
 example : s \ t ∪ t = s ∪ t := by
-  sorry
+  apply Subset.antisymm
+  . rintro x (⟨xs, _⟩ | xt)
+    . exact Or.inl xs
+    . exact Or.inr xt
+  . rintro x (xs | xt)
+    . by_cases xt : (x ∈ t)
+      . exact Or.inr xt
+      . exact Or.inl ⟨xs, xt⟩
+    . exact Or.inr xt
 
 example : s \ t ∪ t \ s = (s ∪ t) \ (s ∩ t) := by
-  sorry
+  apply Subset.antisymm
+  . rintro x (⟨xs, xnt⟩ | ⟨xt, xns⟩)
+    . constructor
+      . exact Or.inl xs
+      . contrapose! xnt with xst
+        exact xst.right
+    . constructor
+      . exact Or.inr xt
+      . contrapose! xns with xst
+        exact xst.left
+  . rintro x ⟨xs | xt, xnst⟩
+    . left
+      constructor
+      . exact xs
+      . contrapose! xnst with xt
+        exact ⟨xs, xt⟩
+    . right
+      constructor
+      . exact xt
+      . contrapose! xnst with xs
+        exact ⟨xs, xt⟩
 
 def evens : Set ℕ :=
   { n | Even n }
@@ -116,7 +164,16 @@ example (x : ℕ) : x ∈ (univ : Set ℕ) :=
   trivial
 
 example : { n | Nat.Prime n } ∩ { n | n > 2 } ⊆ { n | ¬Even n } := by
-  sorry
+  intro n
+  simp
+  intro np
+  rcases Nat.Prime.eq_two_or_odd np with (ntwo | nodd)
+  . intro twoltn
+    absurd ntwo
+    push_neg
+    symm
+    exact ne_of_lt twoltn
+  . exact fun _ ↦ Nat.not_even_iff.mpr nodd
 
 #print Prime
 
@@ -151,11 +208,13 @@ example (h : ∃ x ∈ s, ¬Even x ∧ Prime x) : ∃ x ∈ s, Prime x := by
 section
 variable (ssubt : s ⊆ t)
 
-example (h₀ : ∀ x ∈ t, ¬Even x) (h₁ : ∀ x ∈ t, Prime x) : ∀ x ∈ s, ¬Even x ∧ Prime x := by
-  sorry
+example (h₀ : ∀ x ∈ t, ¬Even x) (h₁ : ∀ x ∈ t, Prime x) : ∀ x ∈ s, ¬Even x ∧ Prime x :=
+  fun x xs ↦ ⟨h₀ x (Set.mem_of_mem_of_subset xs ssubt), h₁ x (Set.mem_of_mem_of_subset xs ssubt)⟩
 
 example (h : ∃ x ∈ s, ¬Even x ∧ Prime x) : ∃ x ∈ t, Prime x := by
-  sorry
+  have ⟨x, xs, _, xp⟩ := h
+  use x
+  exact ⟨Set.mem_of_mem_of_subset xs ssubt, xp⟩
 
 end
 
@@ -194,7 +253,22 @@ example : (⋂ i, A i ∩ B i) = (⋂ i, A i) ∩ ⋂ i, B i := by
 
 
 example : (s ∪ ⋂ i, A i) = ⋂ i, A i ∪ s := by
-  sorry
+  ext x
+  simp only [mem_iInter]
+  constructor
+  . rintro (xs | xai)
+    . exact fun _ ↦ Or.inr xs
+    . simp only [mem_iInter] at xai
+      exact fun i ↦ Or.inl (xai i)
+  . intro xais
+    by_cases xs : x ∈ s
+    . exact Or.inl xs
+    . right
+      simp only [mem_iInter]
+      intro i
+      rcases (xais i) with (xai | xns)
+      . exact xai
+      . contradiction
 
 def primes : Set ℕ :=
   { x | Nat.Prime x }
@@ -215,7 +289,13 @@ example : (⋂ p ∈ primes, { x | ¬p ∣ x }) ⊆ { x | x = 1 } := by
   apply Nat.exists_prime_and_dvd
 
 example : (⋃ p ∈ primes, { x | x ≤ p }) = univ := by
-  sorry
+  apply eq_univ_of_forall
+  intro x
+  have ⟨p, ⟨xlep, pp⟩⟩ := Nat.exists_infinite_primes x
+  rw [mem_iUnion₂]
+  simp
+  use p
+  exact ⟨pp, xlep⟩
 
 end
 
